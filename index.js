@@ -6,10 +6,21 @@ import { router } from './rutas/authRuta.js';
 
 const app = express();
 const port = process.env.PORT || 3000;
+const allowedOrigins = ['http://localhost:5173',
+    'https://psico-app-front.vercel.app'
+];
 
 app.use(express.json());
-app.use(cors({ origin: 'http://localhost:5173' }));
-
+app.use(cors({
+    origin: function (origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('No permitido por CORS'));
+        }
+    },
+    credentials: true
+}));
 
 app.use('/api/pacientes', rutasCrud);
 app.use('/api/calendar', rutasCalendar);
