@@ -1,11 +1,14 @@
 // controladores/googleControaldor.js
-import * as calendarService from '../services/calendarServices.js'; // Asegúrate de que la ruta sea correcta
+import * as calendarService from '../services/calendarServices.js';
 import { google } from 'googleapis';
 import 'dotenv/config';
 
+// 👇 AQUÍ DEFINIMOS LA URL DE TU FRONTEND (VERCEL)
+const FRONTEND_URL = "https://psico-app-front.vercel.app";
+// Nota: Si quieres volver a probar en tu PC, cambia esa línea por "http://localhost:5173"
+
 // 1. Iniciar Auth
 export const googleAuth = (req, res) => {
-    // CORRECCIÓN: Usamos 'getAuthUrl' que es como se llama en tu servicio
     const url = calendarService.getAuthUrl();
     res.redirect(url);
 };
@@ -19,7 +22,7 @@ export const googleCallback = async (req, res) => {
         const tokens = await calendarService.getTokens(code);
         console.log('Tokens obtenidos correctamente.');
 
-        // 2. Configuramos el cliente temporal para leer el perfil
+        // 2. Configuramos el cliente temporal
         const oauth2Client = new google.auth.OAuth2(
             process.env.GOOGLE_CLIENT_ID,
             process.env.GOOGLE_CLIENT_SECRET,
@@ -28,9 +31,9 @@ export const googleCallback = async (req, res) => {
 
         oauth2Client.setCredentials(tokens);
 
-        // 3. Pedimos los datos del usuario (FORMA SEGURA)
-        const oauth2 = google.oauth2('v2'); // Instanciamos la versión 2
-        const userInfo = await oauth2.userinfo.get({ auth: oauth2Client }); // Le pasamos la auth aquí
+        // 3. Pedimos los datos del usuario
+        const oauth2 = google.oauth2('v2');
+        const userInfo = await oauth2.userinfo.get({ auth: oauth2Client });
 
         console.log('Datos de usuario obtenidos:', userInfo.data.email);
 
@@ -46,21 +49,21 @@ export const googleCallback = async (req, res) => {
 
         const dataString = encodeURIComponent(JSON.stringify(dataToSend));
 
-        res.redirect(`http://localhost:5173/calendario?status=success&data=${dataString}`);
+        // 👇 REDIRECCIÓN A VERCEL CON ÉXITO
+        res.redirect(`${FRONTEND_URL}/calendario?status=success&data=${dataString}`);
 
     } catch (error) {
         console.error('❌ Error CRÍTICO en callback:', error);
-        // Redirigimos con error para que sepas qué pasó
-        res.redirect('http://localhost:5173?status=error');
+        // 👇 REDIRECCIÓN A VERCEL CON ERROR
+        res.redirect(`${FRONTEND_URL}?status=error`);
     }
 };
 
-// 3. Agendar (Ejemplo)
+// 3. Agendar
 export const scheduleSession = async (req, res) => {
     const { sessionData, tokens } = req.body;
 
     try {
-        // CORRECCIÓN: Usamos 'createEvent'
         const event = await calendarService.createEvent(tokens, sessionData);
         res.status(201).json({ message: 'Sesión agendada', link: event.htmlLink });
     } catch (error) {
