@@ -1,0 +1,21 @@
+import express from 'express';
+import cors from 'cors';
+import rutasCrud from './rutas/rutasCrud.js';
+import rutasCalendar from './rutas/calendarRuta.js';
+import { router } from './rutas/authRuta.js';
+
+const app = express();
+const port = process.env.PORT || 3000;
+
+app.use(express.json());
+app.use(cors({ origin: 'http://localhost:5173' }));
+
+
+app.use('/api/pacientes', rutasCrud);
+app.use('/api/calendar', rutasCalendar);
+app.use('/api/auth', router);
+
+
+app.listen(port, () => {
+    console.log(`Server running at http://localhost:${port}/`);
+});

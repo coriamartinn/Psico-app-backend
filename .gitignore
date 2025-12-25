@@ -1,0 +1,10 @@
+# Dependencias (pesan mucho)
+node_modules/
+
+# Seguridad (tienen tus contraseñas)
+.env
+ca.pem
+
+# Archivos de sistema y logs (opcional pero recomendado)
+.DS_Store
+*.log
