@@ -1,15 +1,14 @@
 import { Router } from "express";
 import { getAll, createPatient, updatePatient, deletePatient, getPatientById } from "../controladores/controladorCrud.js";
+import { verifyToken } from "../middlewares/authMiddleware.js";
 
 const router = Router();
 
-router.get('/', getAll);
-router.post('/', createPatient);
-
-router.delete('/:id', deletePatient);
-router.get('/:id', getPatientById);
-router.put('/:id', updatePatient);
-
+router.get('/', verifyToken, getAll);
+router.post('/', verifyToken, createPatient);
+router.delete('/:id', verifyToken, deletePatient);
+router.get('/:id', verifyToken, getPatientById);
+router.put('/:id', verifyToken, updatePatient);
 
 
 export default router;

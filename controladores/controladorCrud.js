@@ -1,11 +1,14 @@
 import { pool } from "../db.js";
 
-// 1. OBTENER TODOS (Para la lista)
+// 1. OBTENER TODOS (SOLO LOS TUYOS)
 export const getAll = async (req, res) => {
     try {
-        // Filtramos por usuario para que cada psicólogo vea SOLO sus pacientes
-        // (Asumiendo que luego implementaremos esa seguridad, por ahora trae todos)
-        const [datos] = await pool.query('SELECT * FROM patients');
+        // 👇 MAGIA: Sacamos el ID del token (gracias al middleware verifyToken)
+        const userId = req.user.id;
+
+        // Filtramos: "Traeme pacientes DONDE el dueño sea este usuario"
+        const [datos] = await pool.query('SELECT * FROM patients WHERE user_id = ?', [userId]);
+
         res.status(200).json(datos);
     } catch (e) {
         console.error(e);
@@ -13,14 +16,17 @@ export const getAll = async (req, res) => {
     }
 };
 
-// 2. OBTENER UNO SOLO (Para el botón Editar - ESTO FALTABA)
+// 2. OBTENER UNO SOLO (SOLO SI ES TUYO)
 export const getPatientById = async (req, res) => {
     try {
         const { id } = req.params;
-        const [rows] = await pool.query('SELECT * FROM patients WHERE id = ?', [id]);
+        const userId = req.user.id; // 👇 Tu ID
+
+        // Agregamos "AND user_id = ?" para seguridad
+        const [rows] = await pool.query('SELECT * FROM patients WHERE id = ? AND user_id = ?', [id, userId]);
 
         if (rows.length === 0) {
-            return res.status(404).json({ message: "Paciente no encontrado" });
+            return res.status(404).json({ message: "Paciente no encontrado o no tienes permiso" });
         }
 
         res.json(rows[0]);
@@ -30,9 +36,11 @@ export const getPatientById = async (req, res) => {
     }
 };
 
-// 3. CREAR PACIENTE
+// 3. CREAR PACIENTE (CON TU FIRMA AUTOMÁTICA)
 export const createPatient = async (req, res) => {
     try {
+        const userId = req.user.id; // 👇 Tu ID automático
+
         const {
             first_name,
             last_name,
@@ -41,13 +49,10 @@ export const createPatient = async (req, res) => {
             parent_contact,
             drive_link,
             birth_date,
-            school_name,
-            user_id
+            school_name
         } = req.body;
 
-        if (!user_id) {
-            return res.status(400).json({ message: "Error: Falta identificar al usuario (user_id)" });
-        }
+        // Ya no pedimos user_id en el body, lo tomamos del token
 
         const sql = `
             INSERT INTO patients 
@@ -60,11 +65,11 @@ export const createPatient = async (req, res) => {
             last_name,
             diagnosis,
             school_grade,
-            school_name, // Agregado campo escuela
+            school_name,
             parent_contact,
             drive_link,
             birth_date,
-            user_id
+            userId // 👈 Aquí se inserta tu ID automáticamente
         ]);
 
         res.status(201).json({
@@ -80,11 +85,12 @@ export const createPatient = async (req, res) => {
     }
 };
 
-// 4. ACTUALIZAR PACIENTE (Corregido para coincidir con Frontend)
+// 4. ACTUALIZAR PACIENTE (SOLO SI ES TUYO)
 export const updatePatient = async (req, res) => {
     try {
         const { id } = req.params;
-        // IMPORTANTE: Recibimos los mismos nombres que envía el FormularioPaciente.jsx
+        const userId = req.user.id; // 👇 Tu ID
+
         const {
             first_name,
             last_name,
@@ -96,6 +102,7 @@ export const updatePatient = async (req, res) => {
             drive_link
         } = req.body;
 
+        // Agregamos "AND user_id = ?" para que no puedas editar pacientes de otro
         const [result] = await pool.query(
             `UPDATE patients SET 
                 first_name = ?, 
@@ -106,12 +113,12 @@ export const updatePatient = async (req, res) => {
                 school_name = ?, 
                 parent_contact = ?,
                 drive_link = ?
-            WHERE id = ?`,
-            [first_name, last_name, birth_date, diagnosis, school_grade, school_name, parent_contact, drive_link, id]
+            WHERE id = ? AND user_id = ?`,
+            [first_name, last_name, birth_date, diagnosis, school_grade, school_name, parent_contact, drive_link, id, userId]
         );
 
         if (result.affectedRows === 0) {
-            return res.status(404).json({ message: "Paciente no encontrado" });
+            return res.status(404).json({ message: "No se pudo actualizar (Paciente no encontrado o no es tuyo)" });
         }
 
         res.json({ message: "Paciente actualizado correctamente" });
@@ -122,14 +129,17 @@ export const updatePatient = async (req, res) => {
     }
 };
 
-// 5. ELIMINAR PACIENTE
+// 5. ELIMINAR PACIENTE (SOLO SI ES TUYO)
 export const deletePatient = async (req, res) => {
     try {
         const { id } = req.params;
-        const [result] = await pool.query('DELETE FROM patients WHERE id = ?', [id]);
+        const userId = req.user.id; // 👇 Tu ID
+
+        // Agregamos "AND user_id = ?"
+        const [result] = await pool.query('DELETE FROM patients WHERE id = ? AND user_id = ?', [id, userId]);
 
         if (result.affectedRows === 0) {
-            return res.status(404).json({ message: "Paciente no encontrado" });
+            return res.status(404).json({ message: "No se pudo eliminar (Paciente no encontrado o no es tuyo)" });
         }
 
         res.sendStatus(204);
