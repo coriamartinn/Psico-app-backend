@@ -7,7 +7,7 @@ import {
     crearInforme,    // Para guardar (Generador)
     firmarInforme,   // Para el botón de firmar
     eliminarInforme  // Para el botón de borrar
-} from '../controladores/informesControlador.js';
+} from '../controladores/informeControlador.js';
 
 const router = Router();
 
