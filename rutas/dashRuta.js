@@ -6,10 +6,12 @@ import { getDashboardStats } from '../controladores/dashboardControlador.js';
 
 // ... (tus otras importaciones de pacientes) ...
 
-export const router = Router();
+const router = Router();
 
 // ... (tus rutas de pacientes: get, post, delete...) ...
 
 // 👇 2. AGREGA ESTA RUTA NUEVA
 // Es fundamental que uses 'verifyToken' para saber DE QUÉ usuario sacar las estadísticas
 router.get('/dashboard/stats', verifyToken, getDashboardStats);
+
+export default router;
