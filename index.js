@@ -4,6 +4,7 @@ import rutasCrud from './rutas/rutasCrud.js';
 import rutasCalendar from './rutas/calendarRuta.js';
 import { router } from './rutas/authRuta.js';
 import dashRuta from './rutas/dashRuta.js';
+import informesRuta from './rutas/informesRuta.js';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -27,6 +28,7 @@ app.use('/api/pacientes', rutasCrud);
 app.use('/api/calendar', rutasCalendar);
 app.use('/api/auth', router);
 app.use('/api/dashboard', dashRuta);
+app.use('/api/informes', informesRuta);
 
 
 app.listen(port, () => {
