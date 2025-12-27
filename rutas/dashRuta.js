@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { verifyToken } from '../middlewares/authMiddleware.js';
 
 // 👇 1. IMPORTA EL CONTROLADOR NUEVO
-import { getDashboardStats } from '../controladores/dashboardController.js';
+import { getDashboardStats } from '../controladores/dashboardControlador.js';
 
 // ... (tus otras importaciones de pacientes) ...
 
