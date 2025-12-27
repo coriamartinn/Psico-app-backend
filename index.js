@@ -4,7 +4,7 @@ import rutasCrud from './rutas/rutasCrud.js';
 import rutasCalendar from './rutas/calendarRuta.js';
 import { router } from './rutas/authRuta.js';
 import dashRuta from './rutas/dashRuta.js';
-import informesRuta from './rutas/informesRuta.js';
+import informesRuta from './rutas/informeRuta.js';
 
 const app = express();
 const port = process.env.PORT || 3000;
