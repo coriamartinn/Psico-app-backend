@@ -12,6 +12,6 @@ const router = Router();
 
 // 👇 2. AGREGA ESTA RUTA NUEVA
 // Es fundamental que uses 'verifyToken' para saber DE QUÉ usuario sacar las estadísticas
-router.get('/dashboard/stats', verifyToken, getDashboardStats);
+router.get('/stats', verifyToken, getDashboardStats);
 
 export default router;
