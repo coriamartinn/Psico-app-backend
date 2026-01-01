@@ -34,3 +34,22 @@ export const verifyToken = (req, res, next) => {
         return res.status(403).json({ message: "Token inválido o expirado" });
     }
 };
+
+
+// Agrega esta función debajo de verifyToken
+export const verifyPayment = async (req, res, next) => {
+    try {
+        // req.user ya existe gracias a verifyToken que corre antes
+        const [rows] = await pool.query('SELECT is_paid FROM users WHERE id = ?', [req.user.id]);
+
+        if (rows.length === 0) return res.status(404).json({ message: "Usuario no encontrado" });
+
+        if (rows[0].is_paid === 1) {
+            next(); // Pagó, pase señor
+        } else {
+            return res.status(403).json({ message: "Pago requerido", requirePayment: true });
+        }
+    } catch (error) {
+        return res.status(500).json({ message: "Error verificando pago" });
+    }
+};
