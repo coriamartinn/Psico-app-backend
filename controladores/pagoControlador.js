@@ -13,18 +13,13 @@ export const crearOrden = async (req, res) => {
 
         const result = await preference.create({
             body: {
-                // 👇 ESTO ES LO NUEVO: Simulamos un comprador invitado para evitar el bloqueo 403
-                payer: {
-                    email: "test_user_1923812@testuser.com"
-                },
-
                 items: [
                     {
                         id: 'beta_access',
                         title: 'Acceso Vitalicio - PsicoApp Beta',
                         quantity: 1,
-                        unit_price: 15000,
-                        currency_id: 'ARS' // Importante para evitar errores de moneda
+                        unit_price: 75000,
+                        currency_id: 'ARS' // 👈 ESTO FALTABA (Importante para evitar errores de moneda)
                     }
                 ],
                 // IMPORTANTE: Aquí mandamos el ID del usuario para saber quién pagó después
