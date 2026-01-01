@@ -12,7 +12,8 @@ import pagoRuta from './rutas/pagoRuta.js';
 const app = express();
 const port = process.env.PORT || 3000;
 const allowedOrigins = ['http://localhost:5173',
-    'https://app.coriadev.com/'
+    'https://psico-app-front.vercel.app',
+    'https://app.coriadev.com'
 ];
 
 app.use(express.json());
