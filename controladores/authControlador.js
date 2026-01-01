@@ -66,7 +66,8 @@ export const login = async (req, res) => {
                     nombre: usuario.full_name,
                     email: usuario.email,
                     matricula: usuario.matricula,
-                    token: token
+                    token: token,
+                    is_paid: usuario.is_paid
                 }
             });
         } else {
