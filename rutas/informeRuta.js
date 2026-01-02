@@ -7,12 +7,12 @@ import {
     actualizarInforme,
     eliminarInforme
 } from '../controladores/informeControlador.js';
-import { verificarToken } from '../middlewares/authMiddleware.js';
+import { verifyToken } from '../middlewares/authMiddleware.js';
 
 const router = Router();
 
 // Todas las rutas requieren estar logueado
-router.use(verificarToken);
+router.use(verifyToken);
 
 // Rutas exactas que espera tu Frontend:
 router.get('/', getInformes);              // Para fetchInformes()
