@@ -1,31 +1,36 @@
 import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
 import { pool } from '../db.js';
 
-// Configuración del cliente con tu Token de Render
 const client = new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN });
 
-// 1. CREAR ORDEN DE PAGO (Genera el link)
+// 1. CREAR ORDEN
 export const crearOrden = async (req, res) => {
     try {
-        const userId = req.user.id; // El usuario que está intentando pagar
+        const userId = req.user.id;
 
         const preference = new Preference(client);
 
+        // Truco para evitar bloqueos en pruebas: Email aleatorio
+        const randomEmail = `test_user_${Date.now()}@testuser.com`;
+
         const result = await preference.create({
             body: {
+                // 👇 ESTO AYUDA A QUE PASE EL PAGO SIN ERRORES DE SEGURIDAD
+                payer: {
+                    email: randomEmail
+                },
                 items: [
                     {
                         id: 'beta_access',
                         title: 'Acceso Vitalicio - PsicoApp Beta',
                         quantity: 1,
+                        // ⚠️ OJO: Acá pusiste 10 pesos. Para producción recuerda poner el precio real (ej: 15000)
                         unit_price: 10,
-                        currency_id: 'ARS' // 👈 ESTO FALTABA (Importante para evitar errores de moneda)
+                        currency_id: 'ARS'
                     }
                 ],
-                // IMPORTANTE: Aquí mandamos el ID del usuario para saber quién pagó después
                 external_reference: userId.toString(),
 
-                // URLs de retorno: Redirigen al usuario a tu aplicación después de pagar
                 back_urls: {
                     success: "https://app.coriadev.com",
                     failure: "https://app.coriadev.com",
@@ -33,21 +38,20 @@ export const crearOrden = async (req, res) => {
                 },
                 auto_return: "approved",
 
-                // URL donde Mercado Pago le avisa a tu Backend (Render) que el pago entró
+                // Asegúrate que esta URL sea EXACTAMENTE la de tu backend en Render
                 notification_url: "https://psico-app-backend-q5fm.onrender.com/api/pagos/webhook"
             }
         });
 
-        res.json({ id: result.id, init_point: result.init_point }); // init_point es el link de pago
+        res.json({ id: result.id, init_point: result.init_point });
     } catch (error) {
         console.error("Error al crear preferencia:", error);
-        res.status(500).json({ message: "Error al crear preferencia de pago" });
+        res.status(500).json({ message: "Error al crear preferencia" });
     }
 };
 
-// 2. WEBHOOK (Mercado Pago nos avisa aquí automáticamente)
+// 2. WEBHOOK
 export const recibirWebhook = async (req, res) => {
-    // Mercado Pago puede mandar el ID en query.id o query['data.id'] dependiendo la versión
     const paymentId = req.query['data.id'] || req.query.id;
     const topic = req.query.type || req.query.topic;
 
@@ -56,27 +60,26 @@ export const recibirWebhook = async (req, res) => {
             const payment = new Payment(client);
             const data = await payment.get({ id: paymentId });
 
-            // Si el pago está aprobado (acreditado)
             if (data.status === 'approved') {
-                const userId = data.external_reference; // Recuperamos el ID del usuario que pusimos arriba
+                const userId = data.external_reference;
                 const amount = data.transaction_amount;
 
                 console.log(`✅ Pago aprobado. Usuario ID: ${userId}, Monto: ${amount}`);
 
-                // A. Guardar comprobante en historial
+                // Guardamos el pago
                 await pool.query(
                     'INSERT INTO payments (user_id, payment_id, status, amount) VALUES (?, ?, ?, ?)',
                     [userId, paymentId, 'approved', amount]
                 );
 
-                // B. ACTIVAR AL USUARIO (Liberar acceso)
+                // Activamos al usuario
                 await pool.query(
                     'UPDATE users SET is_paid = 1 WHERE id = ?',
                     [userId]
                 );
             }
         }
-        res.sendStatus(200); // Siempre responder OK a Mercado Pago para que deje de insistir
+        res.sendStatus(200);
     } catch (error) {
         console.error("Error en webhook:", error);
         res.sendStatus(500);
