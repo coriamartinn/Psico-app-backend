@@ -7,7 +7,7 @@ import {
     actualizarInforme,
     eliminarInforme
 } from '../controladores/informeControlador.js';
-import { verificarToken } from '../middleware/auth.middleware.js'; // Tu middleware de seguridad
+import { verificarToken } from '../middlewares/authMiddleware.js';
 
 const router = Router();
 
