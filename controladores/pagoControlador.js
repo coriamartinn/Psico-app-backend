@@ -18,7 +18,7 @@ export const crearOrden = async (req, res) => {
                         id: 'beta_access',
                         title: 'Acceso Vitalicio - PsicoApp Beta',
                         quantity: 1,
-                        unit_price: 75000,
+                        unit_price: 10,
                         currency_id: 'ARS' // 👈 ESTO FALTABA (Importante para evitar errores de moneda)
                     }
                 ],
