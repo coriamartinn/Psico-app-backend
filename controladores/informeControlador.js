@@ -3,10 +3,7 @@ import { pool } from '../db.js';
 // 1. OBTENER LISTA DE INFORMES (Historial)
 export const getInformes = async (req, res) => {
     try {
-        const user_id = req.user.id; // ID del profesional logueado
-
-        // NOTA: Asumo que tu tabla de pacientes se llama 'patients' o 'pacientes'.
-        // Si en tu DB se llama 'pacientes', cambia 'JOIN patients' por 'JOIN pacientes'
+        const user_id = req.user.id;
         const [rows] = await pool.query(`
             SELECT r.id, 
                    r.motivo as tipo, 
@@ -19,13 +16,12 @@ export const getInformes = async (req, res) => {
             ORDER BY r.created_at DESC
         `, [user_id]);
 
-        // Formateamos para que el Frontend (ListaInformes.jsx) lo entienda
         const informes = rows.map(row => ({
             id: row.id,
             paciente: `${row.first_name} ${row.last_name}`,
-            tipo: "Informe Psicopedagógico", // O puedes usar row.tipo si guardas el título ahí
+            tipo: row.tipo || "Informe Psicopedagógico",
             fecha: new Date(row.fecha).toLocaleDateString('es-AR'),
-            firmado: row.status === 'firmado' // Convertimos el ENUM a booleano
+            firmado: row.status === 'firmado'
         }));
 
         res.json(informes);
@@ -35,20 +31,43 @@ export const getInformes = async (req, res) => {
     }
 };
 
-// 2. FIRMAR INFORME
+// ✨ 2. NUEVO: OBTENER UN SOLO INFORME (Para ver el detalle completo)
+export const getInformeById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const user_id = req.user.id; // Seguridad: solo el dueño puede verlo
+
+        const [rows] = await pool.query(`
+            SELECT r.*, p.first_name, p.last_name
+            FROM reports r
+            JOIN patients p ON r.patient_id = p.id
+            WHERE r.id = ? AND r.user_id = ?
+        `, [id, user_id]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ message: 'Informe no encontrado' });
+        }
+
+        res.json(rows[0]); // Devolvemos el objeto completo con todo el texto
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Error al obtener el informe' });
+    }
+};
+
+// 3. FIRMAR INFORME
 export const firmarInforme = async (req, res) => {
     try {
         const { id } = req.params;
         const user_id = req.user.id;
 
-        // Actualizamos el status a 'firmado'
         const [result] = await pool.query(
             "UPDATE reports SET status = 'firmado' WHERE id = ? AND user_id = ?",
             [id, user_id]
         );
 
         if (result.affectedRows === 0) {
-            return res.status(404).json({ message: 'Informe no encontrado o no autorizado' });
+            return res.status(404).json({ message: 'Informe no encontrado' });
         }
 
         res.json({ message: 'Informe firmado correctamente' });
@@ -58,11 +77,39 @@ export const firmarInforme = async (req, res) => {
     }
 };
 
-// 3. ELIMINAR INFORME
+// ✨ 4. NUEVO: EDITAR INFORME (Antes de firmar)
+export const actualizarInforme = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const user_id = req.user.id;
+        const { motivo, tecnicas, cognitivo, lectoescritura, conclusiones } = req.body;
+
+        // Validamos que el informe no esté firmado ya (opcional, pero recomendado)
+        const [check] = await pool.query("SELECT status FROM reports WHERE id = ?", [id]);
+        if (check.length > 0 && check[0].status === 'firmado') {
+            return res.status(400).json({ message: 'No se puede editar un informe firmado' });
+        }
+
+        const [result] = await pool.query(`
+            UPDATE reports 
+            SET motivo = ?, tecnicas = ?, cognitivo = ?, lectoescritura = ?, conclusiones = ?
+            WHERE id = ? AND user_id = ?
+        `, [motivo, tecnicas, cognitivo, lectoescritura, conclusiones, id, user_id]);
+
+        if (result.affectedRows === 0) return res.status(404).json({ message: 'No se pudo actualizar' });
+
+        res.json({ message: 'Informe actualizado correctamente' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Error al actualizar' });
+    }
+};
+
+// 5. ELIMINAR INFORME
 export const eliminarInforme = async (req, res) => {
     try {
         const { id } = req.params;
-        const user_id = req.user.id; // Seguridad extra: verificar que sea del usuario
+        const user_id = req.user.id;
 
         const [result] = await pool.query('DELETE FROM reports WHERE id = ? AND user_id = ?', [id, user_id]);
 
@@ -74,11 +121,11 @@ export const eliminarInforme = async (req, res) => {
     }
 };
 
-// 4. GUARDAR INFORME (Para el botón "Guardar" o al Generar)
+// 6. GUARDAR INFORME
 export const crearInforme = async (req, res) => {
     try {
         const {
-            paciente_id, // El frontend manda esto
+            paciente_id,
             motivo,
             tecnicas,
             cognitivo,
@@ -88,6 +135,7 @@ export const crearInforme = async (req, res) => {
 
         const user_id = req.user.id;
 
+        // OJO: Asegúrate de que tu tabla en MySQL tenga estas columnas
         await pool.query(
             `INSERT INTO reports 
             (patient_id, user_id, motivo, tecnicas, cognitivo, lectoescritura, conclusiones, status) 
