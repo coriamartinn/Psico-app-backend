@@ -19,6 +19,7 @@ export const crearOrden = async (req, res) => {
                 payer: {
                     email: randomEmail
                 },
+                statement_descriptor: "PsicoApp By CoriaDev",
                 items: [
                     {
                         id: 'beta_access',

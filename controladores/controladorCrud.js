@@ -49,15 +49,16 @@ export const createPatient = async (req, res) => {
             parent_contact,
             drive_link,
             birth_date,
-            school_name
+            school_name,
+            school_contact
         } = req.body;
 
         // Ya no pedimos user_id en el body, lo tomamos del token
 
         const sql = `
             INSERT INTO patients 
-            (first_name, last_name, diagnosis, school_grade, school_name, parent_contact, drive_link, birth_date, user_id) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (first_name, last_name, diagnosis, school_grade, school_name, school_contact, parent_contact, drive_link, birth_date, user_id) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         const [result] = await pool.query(sql, [
@@ -66,6 +67,7 @@ export const createPatient = async (req, res) => {
             diagnosis,
             school_grade,
             school_name,
+            school_contact,
             parent_contact,
             drive_link,
             birth_date,
@@ -98,6 +100,7 @@ export const updatePatient = async (req, res) => {
             diagnosis,
             school_grade,
             school_name,
+            school_contact,
             parent_contact,
             drive_link
         } = req.body;
@@ -110,11 +113,12 @@ export const updatePatient = async (req, res) => {
                 birth_date = ?, 
                 diagnosis = ?, 
                 school_grade = ?, 
-                school_name = ?, 
+                school_name = ?,
+                school_contact = ?,
                 parent_contact = ?,
                 drive_link = ?
             WHERE id = ? AND user_id = ?`,
-            [first_name, last_name, birth_date, diagnosis, school_grade, school_name, parent_contact, drive_link, id, userId]
+            [first_name, last_name, birth_date, diagnosis, school_grade, school_name, school_contact, parent_contact, drive_link, id, userId]
         );
 
         if (result.affectedRows === 0) {
