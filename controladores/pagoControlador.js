@@ -41,52 +41,43 @@ export const crearSuscripcion = async (req, res) => {
     }
 };
 
-// 2. WEBHOOK (Detecta cuando se activa la suscripción)
+// 2. WEBHOOK (Con Logs de Depuración)
 export const recibirWebhook = async (req, res) => {
     try {
-        // Mercado Pago envía el tipo de evento en el body
+        // 👇 LOG PARA VER QUÉ LLEGA
+        console.log("🔔 WEBHOOK RECIBIDO:", JSON.stringify(req.body, null, 2));
+
         const { type, data } = req.body;
+        // A veces MP manda 'topic' en vez de 'type' o 'action'
+        const evento = type || req.body.action || req.body.topic;
 
-        // Si es una actualización de suscripción (alta, baja, pago)
-        if (type === 'subscription_preapproval') {
+        // Filtramos solo eventos de suscripción
+        if (evento === 'subscription_preapproval' || (data && data.id)) {
             const preapprovalId = data.id;
+            console.log("🔎 Consultando suscripción ID:", preapprovalId);
 
-            // Consultamos a MP el estado real de esa suscripción
             const preapproval = new PreApproval(client);
             const subData = await preapproval.get({ id: preapprovalId });
 
-            // 'authorized' significa que la tarjeta pasó y la suscripción (y el mes gratis) está activa
+            console.log("📄 Estado en MP:", subData.status);
+            console.log("👤 User ID (Ref):", subData.external_reference);
+
             if (subData.status === 'authorized') {
-                const userId = subData.external_reference; // Recuperamos el ID que enviamos antes
+                const userId = subData.external_reference;
 
-                console.log(`✅ Suscripción Autorizada. Usuario ID: ${userId}. Activando Premium...`);
+                console.log(`✅ Suscripción Autorizada para User ${userId}. Activando...`);
 
-                // 1. Actualizamos al usuario como PAGADO
                 await pool.query(
                     'UPDATE users SET is_paid = 1 WHERE id = ?',
                     [userId]
                 );
-
-                // 2. (Opcional) Guardamos registro en tabla payments si quieres historial
-                // Nota: payment_id aquí sería el ID de la suscripción
-                /* await pool.query(
-                    'INSERT INTO payments (user_id, payment_id, status, amount) VALUES (?, ?, ?, ?)',
-                    [userId, preapprovalId, 'subscription_started', 0]
-                ); 
-                */
-            }
-
-            // Si el estado es 'cancelled', podrías poner is_paid = 0
-            if (subData.status === 'cancelled') {
-                const userId = subData.external_reference;
-                console.log(`❌ Suscripción Cancelada. Usuario ID: ${userId}`);
-                await pool.query('UPDATE users SET is_paid = 0 WHERE id = ?', [userId]);
+                console.log("🚀 Base de datos actualizada.");
             }
         }
 
-        res.sendStatus(200); // Responder OK siempre a Mercado Pago
+        res.sendStatus(200);
     } catch (error) {
-        console.error("Error en webhook:", error);
+        console.error("❌ Error en webhook:", error);
         res.sendStatus(500);
     }
 };
