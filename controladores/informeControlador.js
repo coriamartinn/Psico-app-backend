@@ -32,9 +32,7 @@ export const getInformes = async (req, res) => {
 };
 
 // ✨ 2. NUEVO: OBTENER UN SOLO INFORME (Para ver el detalle completo)
-import { pool } from '../db.js'; // Asegúrate de tener el import de la pool
 
-// OBTENER UN SOLO INFORME (Con datos del Profesional y Paciente)
 export const getInformeById = async (req, res) => {
     try {
         const { id } = req.params;
