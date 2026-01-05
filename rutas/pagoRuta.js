@@ -5,7 +5,7 @@ import { crearSuscripcion, recibirWebhook } from '../controladores/pagoControlad
 const router = Router();
 
 // Ruta para que el usuario pida el link (Protegida)
-router.post('/crear-orden', verifyToken, crearSuscripcion);
+router.post('/crear-suscripcion', verifyToken, crearSuscripcion);
 
 // Ruta para que Mercado Pago nos avise (Pública, MP no tiene tu token)
 router.post('/webhook', recibirWebhook);
