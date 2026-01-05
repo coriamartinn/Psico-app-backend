@@ -4,14 +4,15 @@ import { pool } from '../db.js';
 export const getInformes = async (req, res) => {
     try {
         const user_id = req.user.id;
-        // Agregamos JOIN users para tener el nombre disponible también en la lista si hace falta
+
+        // CORRECCIÓN: Usamos u.full_name según tu base de datos
         const [rows] = await pool.query(`
             SELECT r.id, 
                    r.motivo as tipo, 
                    r.created_at as fecha, 
                    r.status, 
                    p.first_name as p_nombre, p.last_name as p_apellido,
-                   u.first_name as u_nombre, u.last_name as u_apellido
+                   u.full_name
             FROM reports r
             JOIN patients p ON r.patient_id = p.id
             JOIN users u ON r.user_id = u.id
@@ -22,8 +23,8 @@ export const getInformes = async (req, res) => {
         const informes = rows.map(row => ({
             id: row.id,
             paciente: `${row.p_nombre} ${row.p_apellido}`,
-            // Armamos el nombre del profesional aquí también por si acaso
-            profesional: `${row.u_nombre || ''} ${row.u_apellido || ''}`.trim(),
+            // Usamos directamente full_name
+            profesional: row.full_name || "Profesional",
             tipo: row.tipo || "Informe Psicopedagógico",
             fecha: new Date(row.fecha).toLocaleDateString('es-AR'),
             firmado: row.status === 'firmado'
@@ -36,21 +37,19 @@ export const getInformes = async (req, res) => {
     }
 };
 
-// ✨ 2. OBTENER UN SOLO INFORME (Detalle para PDF)
+// 2. OBTENER UN SOLO INFORME (Detalle para PDF)
 export const getInformeById = async (req, res) => {
     try {
         const { id } = req.params;
         const user_id = req.user.id;
 
-        // CONSULTA SQL ROBUSTA:
-        // Usamos COALESCE(columna, '') para evitar que un NULL rompa todo.
+        // CORRECCIÓN: Usamos u.full_name
         const [rows] = await pool.query(`
             SELECT 
                 r.*, 
                 p.first_name as p_first_name, 
                 p.last_name as p_last_name,
-                COALESCE(u.first_name, '') as u_first_name, 
-                COALESCE(u.last_name, '') as u_last_name, 
+                COALESCE(u.full_name, 'Profesional') as nombre_profesional, 
                 COALESCE(u.matricula, '') as matricula
             FROM reports r
             JOIN patients p ON r.patient_id = p.id
@@ -64,21 +63,14 @@ export const getInformeById = async (req, res) => {
 
         const data = rows[0];
 
-        // Construimos el nombre asegurándonos de limpiar espacios extra
-        const nombreCompleto = `${data.u_first_name} ${data.u_last_name}`.trim();
-
-        // Si por alguna razón vino vacío de la BD, ponemos un fallback claro
-        const profesionalFinal = nombreCompleto.length > 0 ? nombreCompleto : "Usuario (Sin Nombre en BD)";
-
         res.json({
             ...data,
             first_name: data.p_first_name,
             last_name: data.p_last_name,
 
-            // ✨ ESTA VARIABLE ES LA QUE USA EL PDF
-            profesional: profesionalFinal,
+            // ✨ Asignamos el nombre completo que viene de la BD
+            profesional: data.nombre_profesional,
 
-            // Matrícula
             matricula: data.matricula ? `Mat. ${data.matricula}` : "Mat. Pendiente"
         });
 
