@@ -47,10 +47,10 @@ export const createPatient = async (req, res) => {
             diagnosis,
             school_grade,
             parent_contact,
+            school_contact,
             drive_link,
             birth_date,
-            school_name,
-            school_contact
+            school_name
         } = req.body;
 
         // Ya no pedimos user_id en el body, lo tomamos del token

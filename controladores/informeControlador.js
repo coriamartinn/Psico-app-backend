@@ -32,15 +32,32 @@ export const getInformes = async (req, res) => {
 };
 
 // ✨ 2. NUEVO: OBTENER UN SOLO INFORME (Para ver el detalle completo)
+import { pool } from '../db.js'; // Asegúrate de tener el import de la pool
+
+// OBTENER UN SOLO INFORME (Con datos del Profesional y Paciente)
 export const getInformeById = async (req, res) => {
     try {
         const { id } = req.params;
-        const user_id = req.user.id; // Seguridad: solo el dueño puede verlo
 
+        // Obtenemos el ID del usuario que está haciendo la petición 
+        // (para asegurar que solo vea sus propios informes si esa es tu regla de negocio)
+        const user_id = req.user.id;
+
+        // CONSULTA SQL MEJORADA:
+        // 1. Traemos todo del reporte (r.*)
+        // 2. Traemos nombre del paciente con alias (p_first_name, p_last_name)
+        // 3. Traemos nombre del profesional con alias (u_first_name, u_last_name, matricula)
         const [rows] = await pool.query(`
-            SELECT r.*, p.first_name, p.last_name
+            SELECT 
+                r.*, 
+                p.first_name as p_first_name, 
+                p.last_name as p_last_name,
+                u.first_name as u_first_name, 
+                u.last_name as u_last_name, 
+                u.matricula
             FROM reports r
             JOIN patients p ON r.patient_id = p.id
+            JOIN users u ON r.user_id = u.id 
             WHERE r.id = ? AND r.user_id = ?
         `, [id, user_id]);
 
@@ -48,9 +65,25 @@ export const getInformeById = async (req, res) => {
             return res.status(404).json({ message: 'Informe no encontrado' });
         }
 
-        res.json(rows[0]); // Devolvemos el objeto completo con todo el texto
+        const data = rows[0];
+
+        // ARMAMOS LA RESPUESTA PARA EL FRONTEND
+        res.json({
+            ...data,
+
+            // Mapeamos los datos del PACIENTE (para que el título del PDF salga bien)
+            first_name: data.p_first_name,
+            last_name: data.p_last_name,
+
+            // ✨ AQUÍ ESTÁ LA CLAVE: Armamos el nombre del PROFESIONAL desde la BD
+            profesional: `${data.u_first_name} ${data.u_last_name}`,
+
+            // Enviamos la matrícula (o un texto por defecto si es null)
+            matricula: data.matricula ? `Mat. ${data.matricula}` : "Mat. Pendiente"
+        });
+
     } catch (error) {
-        console.error(error);
+        console.error("Error en getInformeById:", error);
         res.status(500).json({ message: 'Error al obtener el informe' });
     }
 };
