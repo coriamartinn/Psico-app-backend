@@ -16,7 +16,7 @@ export const crearSuscripcion = async (req, res) => {
                 auto_recurring: {
                     frequency: 1,
                     frequency_type: "months",
-                    transaction_amount: 75000, // Precio mensual (se cobrará DESPUÉS del mes gratis)
+                    transaction_amount: 1, // Precio mensual (se cobrará DESPUÉS del mes gratis)
                     currency_id: "ARS",
 
                     // ✨ AQUÍ ESTÁ EL TRUCO DEL MES GRATIS ✨
