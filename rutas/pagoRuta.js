@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { verifyToken } from '../middlewares/authMiddleware.js';
-import { crearSuscripcion, recibirWebhook } from '../controladores/pagoControlador.js';
+import { crearSuscripcion, crearPagoVitalicio, recibirWebhook } from '../controladores/pagoControlador.js';
 
 const router = Router();
 
