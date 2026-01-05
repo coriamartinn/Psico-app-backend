@@ -4,21 +4,26 @@ import { pool } from '../db.js';
 export const getInformes = async (req, res) => {
     try {
         const user_id = req.user.id;
+        // Agregamos JOIN users para tener el nombre disponible también en la lista si hace falta
         const [rows] = await pool.query(`
             SELECT r.id, 
                    r.motivo as tipo, 
                    r.created_at as fecha, 
                    r.status, 
-                   p.first_name, p.last_name 
+                   p.first_name as p_nombre, p.last_name as p_apellido,
+                   u.first_name as u_nombre, u.last_name as u_apellido
             FROM reports r
             JOIN patients p ON r.patient_id = p.id
+            JOIN users u ON r.user_id = u.id
             WHERE r.user_id = ?
             ORDER BY r.created_at DESC
         `, [user_id]);
 
         const informes = rows.map(row => ({
             id: row.id,
-            paciente: `${row.first_name} ${row.last_name}`,
+            paciente: `${row.p_nombre} ${row.p_apellido}`,
+            // Armamos el nombre del profesional aquí también por si acaso
+            profesional: `${row.u_nombre || ''} ${row.u_apellido || ''}`.trim(),
             tipo: row.tipo || "Informe Psicopedagógico",
             fecha: new Date(row.fecha).toLocaleDateString('es-AR'),
             firmado: row.status === 'firmado'
@@ -31,28 +36,22 @@ export const getInformes = async (req, res) => {
     }
 };
 
-// ✨ 2. NUEVO: OBTENER UN SOLO INFORME (Para ver el detalle completo)
-
+// ✨ 2. OBTENER UN SOLO INFORME (Detalle para PDF)
 export const getInformeById = async (req, res) => {
     try {
         const { id } = req.params;
-
-        // Obtenemos el ID del usuario que está haciendo la petición 
-        // (para asegurar que solo vea sus propios informes si esa es tu regla de negocio)
         const user_id = req.user.id;
 
-        // CONSULTA SQL MEJORADA:
-        // 1. Traemos todo del reporte (r.*)
-        // 2. Traemos nombre del paciente con alias (p_first_name, p_last_name)
-        // 3. Traemos nombre del profesional con alias (u_first_name, u_last_name, matricula)
+        // CONSULTA SQL ROBUSTA:
+        // Usamos COALESCE(columna, '') para evitar que un NULL rompa todo.
         const [rows] = await pool.query(`
             SELECT 
                 r.*, 
                 p.first_name as p_first_name, 
                 p.last_name as p_last_name,
-                u.first_name as u_first_name, 
-                u.last_name as u_last_name, 
-                u.matricula
+                COALESCE(u.first_name, '') as u_first_name, 
+                COALESCE(u.last_name, '') as u_last_name, 
+                COALESCE(u.matricula, '') as matricula
             FROM reports r
             JOIN patients p ON r.patient_id = p.id
             JOIN users u ON r.user_id = u.id 
@@ -65,18 +64,21 @@ export const getInformeById = async (req, res) => {
 
         const data = rows[0];
 
-        // ARMAMOS LA RESPUESTA PARA EL FRONTEND
+        // Construimos el nombre asegurándonos de limpiar espacios extra
+        const nombreCompleto = `${data.u_first_name} ${data.u_last_name}`.trim();
+
+        // Si por alguna razón vino vacío de la BD, ponemos un fallback claro
+        const profesionalFinal = nombreCompleto.length > 0 ? nombreCompleto : "Usuario (Sin Nombre en BD)";
+
         res.json({
             ...data,
-
-            // Mapeamos los datos del PACIENTE (para que el título del PDF salga bien)
             first_name: data.p_first_name,
             last_name: data.p_last_name,
 
-            // ✨ AQUÍ ESTÁ LA CLAVE: Armamos el nombre del PROFESIONAL desde la BD
-            profesional: `${data.u_first_name} ${data.u_last_name}`,
+            // ✨ ESTA VARIABLE ES LA QUE USA EL PDF
+            profesional: profesionalFinal,
 
-            // Enviamos la matrícula (o un texto por defecto si es null)
+            // Matrícula
             matricula: data.matricula ? `Mat. ${data.matricula}` : "Mat. Pendiente"
         });
 
@@ -108,14 +110,13 @@ export const firmarInforme = async (req, res) => {
     }
 };
 
-// ✨ 4. NUEVO: EDITAR INFORME (Antes de firmar)
+// 4. EDITAR INFORME
 export const actualizarInforme = async (req, res) => {
     try {
         const { id } = req.params;
         const user_id = req.user.id;
         const { motivo, tecnicas, cognitivo, lectoescritura, conclusiones } = req.body;
 
-        // Validamos que el informe no esté firmado ya (opcional, pero recomendado)
         const [check] = await pool.query("SELECT status FROM reports WHERE id = ?", [id]);
         if (check.length > 0 && check[0].status === 'firmado') {
             return res.status(400).json({ message: 'No se puede editar un informe firmado' });
@@ -166,7 +167,6 @@ export const crearInforme = async (req, res) => {
 
         const user_id = req.user.id;
 
-        // OJO: Asegúrate de que tu tabla en MySQL tenga estas columnas
         await pool.query(
             `INSERT INTO reports 
             (patient_id, user_id, motivo, tecnicas, cognitivo, lectoescritura, conclusiones, status) 
