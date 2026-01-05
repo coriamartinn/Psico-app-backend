@@ -1,106 +1,115 @@
-import { MercadoPagoConfig, PreApproval } from 'mercadopago';
+import { MercadoPagoConfig, PreApproval, Preference, Payment } from 'mercadopago'; // 👈 Agregamos Preference y Payment
 import { pool } from '../db.js';
 
 const client = new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN });
 
-// 1. CREAR SUSCRIPCIÓN (Con 1 Mes de Prueba Gratis)
+// 1. SUSCRIPCIÓN MENSUAL (is_paid = 1)
 export const crearSuscripcion = async (req, res) => {
     try {
         const userId = req.user.id;
-
         const preapproval = new PreApproval(client);
 
         const result = await preapproval.create({
             body: {
-                reason: "Suscripción Premium PsicoApp", // Nombre que sale en el resumen
+                reason: "Suscripción Premium PsicoApp",
                 auto_recurring: {
                     frequency: 1,
                     frequency_type: "months",
-                    transaction_amount: 35000, // Precio mensual (se cobrará DESPUÉS del mes gratis)
+                    transaction_amount: 35000,
                     currency_id: "ARS",
-
-                    // ✨ CONFIGURACIÓN DEL MES GRATIS
-                    free_trial: {
-                        frequency: 1,
-                        frequency_type: "months"
-                    }
+                    free_trial: { frequency: 1, frequency_type: "months" }
                 },
-                back_url: "https://app.coriadev.com", // A donde vuelve el usuario
-                payer_email: "test_user_123@testuser.com", // Email de prueba
-                external_reference: userId.toString(), // ID del usuario para identificarlo
+                back_url: "https://app.coriadev.com",
+                payer_email: "test_user_123@testuser.com",
+                external_reference: userId.toString(),
                 status: "pending"
             }
         });
-
-        // Devolvemos el link de suscripción al frontend
         res.json({ init_point: result.init_point });
-
     } catch (error) {
-        console.error("Error al crear suscripción:", error);
+        console.error(error);
         res.status(500).json({ message: "Error al crear suscripción" });
     }
 };
 
-// 2. WEBHOOK BLINDADO (Detecta y Activa)
+// 2. PAGO VITALICIO (NUEVO) (is_paid = 2)
+export const crearPagoVitalicio = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const preference = new Preference(client);
+
+        const result = await preference.create({
+            body: {
+                items: [
+                    {
+                        id: 'vitalicio',
+                        title: 'Acceso Vitalicio PsicoApp',
+                        quantity: 1,
+                        unit_price: 150000, // Pon el precio que quieras para el "Para Siempre"
+                        currency_id: 'ARS'
+                    }
+                ],
+                back_urls: {
+                    success: "https://app.coriadev.com",
+                    failure: "https://app.coriadev.com",
+                    pending: "https://app.coriadev.com"
+                },
+                auto_return: "approved",
+                external_reference: userId.toString(), // 👈 CLAVE: Enviamos ID de usuario
+                notification_url: "https://psico-app-backend-q5fm.onrender.com/api/pagos/webhook"
+            }
+        });
+
+        res.json({ init_point: result.init_point });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Error al crear pago vitalicio" });
+    }
+};
+
+// 3. WEBHOOK MAESTRO (Maneja todo)
 export const recibirWebhook = async (req, res) => {
     try {
-        // 👇 LOG PARA DEPURACIÓN
-        console.log("🔔 WEBHOOK RECIBIDO:", JSON.stringify(req.body, null, 2));
-
         const { type, data } = req.body;
-        // A veces MP manda 'topic' o 'action' en vez de 'type'
-        const evento = type || req.body.action || req.body.topic;
+        const topic = type || req.body.topic || req.body.action;
 
-        // 👇 SEGURIDAD: Buscamos el ID de forma segura (data?.id)
-        // para que no explote si 'data' viene undefined.
-        const preapprovalId = data?.id || req.body.id;
+        // A. MANEJO DE SUSCRIPCIONES (is_paid = 1)
+        if (topic === 'subscription_preapproval') {
+            const preapprovalId = data?.id || req.body.id;
+            if (preapprovalId) {
+                const preapproval = new PreApproval(client);
+                const subData = await preapproval.get({ id: preapprovalId });
 
-        // Si no hay ID, ignoramos el mensaje (salvo que sea un test ping)
-        if (!preapprovalId) {
-            if (req.body.action !== "test_created") {
-                console.log("⚠️ Webhook sin ID de suscripción. Ignorando.");
-            }
-            return res.sendStatus(200);
-        }
-
-        // Filtramos eventos relevantes
-        if (evento === 'subscription_preapproval' || preapprovalId) {
-
-            console.log("🔎 Consultando suscripción ID:", preapprovalId);
-
-            const preapproval = new PreApproval(client);
-            const subData = await preapproval.get({ id: preapprovalId });
-
-            console.log("📄 Estado en MP:", subData.status);
-            console.log("👤 User ID (Ref):", subData.external_reference);
-
-            const userId = subData.external_reference;
-
-            // CASO 1: SUSCRIPCIÓN ACTIVA (Authorized)
-            if (subData.status === 'authorized') {
-                if (userId) {
-                    console.log(`✅ ¡CONFIRMADO! Activando Premium para User ID: ${userId}`);
-
-                    await pool.query(
-                        'UPDATE users SET is_paid = 1 WHERE id = ?',
-                        [userId]
-                    );
-                    console.log("🚀 Base de datos actualizada (is_paid = 1).");
-                }
-            }
-
-            // CASO 2: SUSCRIPCIÓN CANCELADA
-            else if (subData.status === 'cancelled') {
-                if (userId) {
-                    console.log(`❌ Suscripción Cancelada. Desactivando User ID: ${userId}`);
-                    await pool.query('UPDATE users SET is_paid = 0 WHERE id = ?', [userId]);
+                if (subData.status === 'authorized') {
+                    const userId = subData.external_reference;
+                    await pool.query('UPDATE users SET is_paid = 1 WHERE id = ?', [userId]);
+                    console.log(`✅ Suscripción activada para User ${userId}`);
                 }
             }
         }
 
-        res.sendStatus(200); // Responder SIEMPRE OK a Mercado Pago
+        // B. MANEJO DE PAGO ÚNICO / VITALICIO (is_paid = 2)
+        else if (topic === 'payment') {
+            const paymentId = data?.id || req.body.data?.id;
+            if (paymentId) {
+                const payment = new Payment(client);
+                const payData = await payment.get({ id: paymentId });
+
+                if (payData.status === 'approved') {
+                    const userId = payData.external_reference;
+
+                    // Verificamos si es el pago vitalicio por el monto o descripción (opcional)
+                    // O simplemente asumimos que si pagó una preferencia, es el vitalicio.
+
+                    await pool.query('UPDATE users SET is_paid = 2 WHERE id = ?', [userId]);
+                    console.log(`🌟 VITALICIO activado para User ${userId}`);
+                }
+            }
+        }
+
+        res.sendStatus(200);
     } catch (error) {
-        console.error("💥 Error en webhook:", error);
+        console.error("Error Webhook:", error);
         res.sendStatus(500);
     }
 };

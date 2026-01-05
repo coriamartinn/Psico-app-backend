@@ -8,6 +8,7 @@ const router = Router();
 router.post('/crear-suscripcion', verifyToken, crearSuscripcion);
 
 // Ruta para que Mercado Pago nos avise (Pública, MP no tiene tu token)
+router.post('/crear-vitalicio', verifyToken, crearPagoVitalicio);
 router.post('/webhook', recibirWebhook);
 
 export default router;
